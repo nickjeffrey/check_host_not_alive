@@ -1,0 +1,211 @@
+#!/bin/sh
+
+# OUTSTANDING TASKS
+# -----------------
+
+
+# CHANGE LOG
+# ----------
+#  2023/10/14   njeffrey    Script created
+
+
+
+# NOTES
+# -----
+# nagios check to report if a host is UP.  
+# This is the opposite of the built-in check-host-alive command, and is used for hosts that SHOULD always be down.
+# In other words, alert with PROBLEM if the host is up, send OK message if host is down.
+#
+# This script is intended to be used for hosts that have been decommissioned but still exist in the environment in a powered off state, and should NOT be powered on.
+#
+#  This script is executed on the nagios server as the host_check command.
+#  Add a section similar to the following to the commands.cfg file on the nagios server:
+#  # This is the opposite of checki-host-alive, where the host SHOULD always be down, so send a PROBLEM alert if host is UP, send OK if host is down.
+#  # 'check-host-not-alive' command definition
+#  define command{
+#          command_name    check-host-not-alive
+#          command_line    $USER1$/check_host_not_alive $HOSTADDRESS$
+#          }
+
+#
+#  Update the hosts.cfg file on the nagios server to look similar to:
+#  define host{
+#        use                     generic-host
+#        host_name               myhost.example.com
+#        alias                   myhost.example.com
+#        address                 myhost.example.com
+#        check_command           check-host-not-alive    <----- use this check_command
+#        }
+
+
+# this needs to be outside of any function or subroutine
+host_name=$1
+
+declare_variables() {
+   #
+   # nagios return codes - this script returns a value to nagios for processing
+   #
+   OK=0
+   WARN=1
+   CRITICAL=2
+   UNKNOWN=3
+   CHECK_NAME=ping
+   #
+   # define variables
+   #
+   verbose=no
+   grep=/usr/bin/grep
+   wc=/usr/bin/wc
+   ping=/usr/bin/ping
+   host=/usr/bin/host
+   awk=/usr/bin/awk
+   sed=/usr/bin/sed
+}
+
+
+
+
+sanity_checks() {
+   #
+   # Confirm required files exist
+   #
+   echo $verbose | $grep -q yes && echo Running sanity_checks subroutine
+   #
+   if [ ! -f "$grep" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $grep not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$grep" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $grep not executable by current user "
+      exit $UNKNOWN
+   fi
+   if [ ! -f "$wc" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $wc not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$wc" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $wc not executable by current user "
+      exit $UNKNOWN
+   fi
+   if [ ! -f "$ping" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $ping not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$ping" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $ping not executable by current user "
+      exit $UNKNOWN
+   fi
+   if [ ! -f "$host" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $host not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$host" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $host not executable by current user "
+      exit $UNKNOWN
+   fi
+   if [ ! -f "$awk" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $awk not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$awk" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $awk not executable by current user "
+      exit $UNKNOWN
+   fi
+   if [ ! -f "$sed" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $sed not found "
+      exit $UNKNOWN
+   fi
+   if [ ! -x "$sed" ]; then
+      echo "$CHECK_NAME UNKNOWN required file $sed not executable by current user "
+      exit $UNKNOWN
+   fi
+}
+
+
+
+validate_hostname() {
+   #
+   # Confirm that a valid hostname or IP address was provided as a command line parameter
+   #
+   echo $verbose | $grep -q yes && echo Running validate_hostname subroutine
+   #
+   if [ -z "$host_name" ]; then
+      echo "$CHECK_NAME UNKNOWN Please provide a valid hostname or IP address as a command line parameter"
+      exit $UNKNOWN
+   fi
+   x=`$host $host_name 2>&1`
+   echo $x | $grep -q -E "not found|does not exist" && host_ip=unknown
+   echo $x | $grep -q -E " is |has address"         && host_ip=`echo $x | $sed -e 's/ is / /g' | $sed -e 's/ has address / /g' | $awk '{print $2}' | $sed -e 's/,//g'`
+   #
+   if [ "$host_ip" = "unknown" ]; then
+      echo "$CHECK_NAME WARN - Could not confirm $host_name as a valid hostname or IP address.  Please check for bogus entries in the /etc/hosts file."
+      exit $WARN
+   fi
+   if [ "$host_ip" = "0.0.0.0" ]; then
+      echo "$CHECK_NAME WARN - Found bogus IP address of 0.0.0.0 for $host_name.  Please check for bogus entries in the /etc/hosts file."
+      exit $WARN
+   fi
+   if [ "$host_ip" = "127.0.1.1" ]; then
+      echo "$CHECK_NAME WARN - Found bogus IP address of 127.0.1.1 for $host_name.  Please check for bogus entries in the /etc/hosts file."
+      exit $WARN
+   fi
+   if [ "$host_ip" = "127.0.0.1" ]; then
+      echo "$CHECK_NAME WARN - Found bogus IP address of 127.0.0.1 for $host_name.  Please check for bogus entries in the /etc/hosts file."
+      exit $WARN
+   fi
+}
+
+
+ping_host() {
+   #
+   echo $verbose | $grep -q yes && echo Running ping_host subroutine
+   #
+   result=`ping -c 4 $host_name 2>&1 | grep "packet loss"`
+   echo $verbose | $grep -q yes && echo "$result"
+   host_state=unknown
+   echo $result | $grep -q "100% packet loss" && host_state=down
+   echo $result | $grep -q " 75% packet loss" && host_state=up
+   echo $result | $grep -q " 50% packet loss" && host_state=up
+   echo $result | $grep -q " 25% packet loss" && host_state=up
+   echo $result | $grep -q " 0% packet loss"  && host_state=up
+}
+
+
+
+
+
+
+
+
+
+
+print_output() {
+   #
+   # If we get this far, everything is good
+   #
+   echo $verbose | $grep -q yes && echo Running print_output subroutine
+   #
+   perf_data=""
+   if [ "$host_state" = "down" ]; then
+      echo "$CHECK_NAME OK - host $host_name is down (and is supposed to be down)"
+      exit $OK
+   fi
+   if [ "$host_state" = "up" ]; then
+      echo "$CHECK_NAME WARN - $host_name is up.  This host is supposed to be down at all times."
+      exit $WARN
+   fi
+   if [ "$host_state" = "unknown" ]; then
+      echo "$CHECK_NAME UNKNOWN - Could not determine up/down status of $host_name "
+      exit $UNKNOWN
+   fi
+}
+
+
+
+# ----------------- main body of script ----------------------
+declare_variables
+sanity_checks
+validate_hostname
+ping_host
+print_output
+
