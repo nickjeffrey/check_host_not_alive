@@ -38,9 +38,9 @@ Update the hosts.cfg file on the nagios server to look similar to:
 # OUTPUT
 
 When the host is down (which is the preferred state), output will be similar to:
-<ing src=images/down.png>
+<img src=images/down.png>
 
 When the host is up (which is NOT the preferred state), output will be similar to:
-<ing src=images/up.png>
+<img src=images/up.png>
 
 
