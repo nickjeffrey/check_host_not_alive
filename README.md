@@ -3,8 +3,10 @@ nagios check to confirm a host is down
 
 # NOTES
 
-nagios check to report if a host is UP.  
+nagios check to alert if a host is UP (instead of the typical alert when a host is DOWN).  
+
 This is the opposite of the built-in check-host-alive command, and is used for hosts that SHOULD always be down.
+
 In other words, alert with PROBLEM if the host is up, send OK message if host is down.
 
 This script is intended to be used for hosts that have been decommissioned but still exist in the environment in a powered off state, and should NOT be powered on.
