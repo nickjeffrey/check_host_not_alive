@@ -1,5 +1,5 @@
 # check_host_not_alive
-nagios check to confirm a host is down
+nagios check to confirm a host is down, alert if the host ever comes up  (ie a decommissioned host that should always be down)
 
 # NOTES
 
